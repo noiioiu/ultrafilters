@@ -121,10 +121,10 @@ instance CompactHausdorff (Subset a) where
   limit u = Subset $ runUltrafilter u . Subset . flip elementOf
 
 instance (Eq a) => Eq (Ultrafilter a) where
-  a == b = limit $ (==) <$> a <*> b
+  (==) = (limit .) . liftM2 (==)
 
 instance (Ord a) => Ord (Ultrafilter a) where
-  u `compare` v = limit $ compare <$> u <*> v
+  compare = (limit .) . liftM2 compare
 
 instance (Show a) => Show (Ultrafilter a) where
   show = limit . fmap show
