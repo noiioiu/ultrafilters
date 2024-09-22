@@ -134,3 +134,11 @@ instance (Semigroup a) => Semigroup (Ultrafilter a) where
 
 instance (Monoid a) => Monoid (Ultrafilter a) where
   mempty = pure mempty
+
+instance (Num a) => Num (Ultrafilter a) where
+  fromInteger = pure . fromInteger
+  (+) = liftM2 (+)
+  (*) = liftM2 (*)
+  abs = fmap abs
+  signum = fmap signum
+  negate = fmap negate
