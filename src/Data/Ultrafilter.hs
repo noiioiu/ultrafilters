@@ -1,3 +1,5 @@
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# HLINT ignore "Use newtype instead of data" #-}
@@ -17,6 +19,7 @@ import Control.Monad
 import Data.Either (isLeft)
 import Data.Functor.Contravariant
 import Data.Maybe (fromMaybe, isNothing)
+import GHC.Generics
 
 -- | Power set of @a@.
 newtype Subset a = Subset {elementOf :: a -> Bool}
@@ -58,17 +61,52 @@ instance Monad Ultrafilter where
 --   * @'limit' '.' 'join' = 'limit' '.' 'fmap' 'limit'@
 class CompactHausdorff a where
   limit :: Ultrafilter a -> a
+  default limit :: (Generic a, GCompact (Rep a a)) => Ultrafilter a -> a
+  limit = to . gLimit @(Rep a a) . fmap from
+
+class GCompact a where
+  gLimit :: Ultrafilter a -> a
+
+instance GCompact (V1 p) where
+  gLimit _ = error "void"
+
+instance GCompact (U1 p) where
+  gLimit u = if runUltrafilter u $ singleton U1 then U1 else error "not an ultrafilter"
+
+instance (GCompact c) => GCompact (K1 i c p) where
+  gLimit = K1 . gLimit . fmap unK1
+
+instance (GCompact (x p)) => GCompact (M1 a b x p) where
+  gLimit = M1 . gLimit . fmap unM1
+
+instance (GCompact (x p), GCompact (y p)) => GCompact ((x :+: y) p) where
+  gLimit u =
+    if runUltrafilter u . Subset $ \case L1 _ -> True; R1 _ -> False
+      then
+        L1 . gLimit . Ultrafilter
+          $ contramap
+            (\s -> Subset $ \case L1 x -> elementOf s x; R1 _ -> False)
+          $ getUltrafilter u
+      else
+        R1 . gLimit . Ultrafilter
+          $ contramap
+            (\s -> Subset $ \case L1 _ -> False; R1 x -> elementOf s x)
+          $ getUltrafilter u
+
+instance (GCompact (x p), GCompact (y p)) => GCompact ((x :*: y) p) where
+  gLimit u = gLimit (flip fmap u $ \(x :*: _) -> x) :*: gLimit (flip fmap u $ \(_ :*: x) -> x)
 
 instance CompactHausdorff (Ultrafilter a) where
   limit u = Ultrafilter . Subset $ runUltrafilter u . Subset . flip runUltrafilter
 
-instance CompactHausdorff Bool where
-  limit = ($ Subset id) . runUltrafilter
+deriving instance CompactHausdorff Bool
+
+deriving instance CompactHausdorff Ordering
 
 instance CompactHausdorff Char where
   limit u = head $ filter (runUltrafilter u . Subset . (==)) [minBound .. maxBound]
 
-instance CompactHausdorff Ordering where
+instance CompactHausdorff Int where
   limit u = head $ filter (runUltrafilter u . Subset . (==)) [minBound .. maxBound]
 
 safeHead :: [a] -> Maybe a
