@@ -109,14 +109,6 @@ instance CompactHausdorff Char where
 instance CompactHausdorff Int where
   limit u = head $ filter (runUltrafilter u . Subset . (==)) [minBound .. maxBound]
 
-safeHead :: [a] -> Maybe a
-safeHead (x : _) = Just x
-safeHead _ = Nothing
-
-safeTail :: [a] -> Maybe [a]
-safeTail (_ : t) = Just t
-safeTail _ = Nothing
-
 instance (CompactHausdorff a) => CompactHausdorff (Maybe a) where
   limit u =
     if runUltrafilter u . Subset $ isNothing
@@ -129,9 +121,9 @@ instance (CompactHausdorff a) => CompactHausdorff (Maybe a) where
           $ runUltrafilter u . Subset . maybe True . elementOf
 
 instance (CompactHausdorff a) => CompactHausdorff [a] where
-  limit u = case limit $ fmap safeHead u of
+  limit u = case limit $ fmap (\case (x : _) -> Just x; _ -> Nothing) u of
     Nothing -> []
-    Just x -> x : fromMaybe [] (limit $ fmap safeTail u)
+    Just x -> x : fromMaybe [] (limit $ fmap (\case (_ : t) -> Just t; _ -> Nothing) u)
 
 instance (CompactHausdorff a, CompactHausdorff b) => CompactHausdorff (a, b) where
   limit u = (limit $ fmap fst u, limit $ fmap snd u)
